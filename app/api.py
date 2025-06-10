@@ -1,19 +1,13 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from .database import init_db
+# db_init race condition - need to import models so that init_db creates Files and Transactions models
+from . import models
+
+# Create DB tables on startup, checks that db container is ready (race condition bug)
+init_db()
 
 app = FastAPI()
 
-origins = ["http://localhost", "http://localhost:3000"]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
 @app.get("/")
 def root():
-    return "Hello, World!!!"
+    return "Hello, World!"
