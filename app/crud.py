@@ -23,3 +23,23 @@ def create_transaction(db: Session, file_id: UUID, trans_type: models.Transactio
     )
     db.add(db_transaction)
     db.commit()
+
+
+def update_file_status(db: Session, file_id: UUID, status: models.ProcessingStatus):
+    db_file = get_file(db, file_id)
+    if db_file:
+        db_file.processing_status = status
+        db.commit()
+
+def get_file(db: Session, file_id: UUID):
+    return db.query(models.Files).filter(models.Files.file_id == file_id).first()
+
+def finalize_file_on_completion(db: Session, file_id: UUID, processed_url: str, processing_time: float, original_codec: str, target_codec: str):
+    db_file = get_file(db, file_id)
+    if db_file:
+        db_file.processing_status = models.ProcessingStatus.COMPLETED
+        db_file.processed_file_url = processed_url
+        db_file.original_codec = original_codec
+        db_file.target_codec = target_codec
+        db_file.processing_time = processing_time
+        db.commit()

@@ -21,6 +21,16 @@ services:
       - .env
     volumes:
       - ./:/code # for local dev: binded mount to reload changes to docker: host currentdir to docker /app dir
-
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: worker_container
+    depends_on:
+      - db
+    volumes:
+      - /tmp:/tmp
+    env_file:
+      - .env
 volumes:
   postgres_data:

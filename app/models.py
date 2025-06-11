@@ -18,7 +18,7 @@ class Files(Base):
     raw_file_url = Column(String)
     processed_file_url = Column(String, nullable=True)
     original_codec = Column(String, nullable=True)
-    target_codec = Column(String, default="h265")
+    target_codec = Column(String, nullable=True)
     processing_time = Column(Float, nullable=True)
     created_at = Column(DateTime, default=func.now())
 
