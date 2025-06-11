@@ -13,7 +13,8 @@ class UploadResponse(BaseModel):
 class StatusResponse(BaseModel):
     file_id: UUID
     file_name: str
-    status: ProcessingStatus
+    processing_status: ProcessingStatus
+
 
     class Config:
         orm_mode = True
