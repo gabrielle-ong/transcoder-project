@@ -84,9 +84,10 @@ def get_video_codec(file_path: str) -> str: # returns `h264` or `hevc` (for h265
         raise RuntimeError(f"ffprobe get codec failed: {e.stderr}")
     
 def ffmpeg_popen(command):
-    # prints out process output instead of subprocess.run which waits till it finishes
+    print("ffmpeg_popen")
+    # execute with Popen, stream output from ffmpeg progress from the stderr stream
     try:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, bufsize=1, universal_newlines=True)
         for line in process.stdout:
             print(f"[ffmpeg] {line.strip()}")
