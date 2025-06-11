@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from . import crud, models
+from .models import Codec
 from .database import init_db, SessionLocal
 
 # Main loop to poll SQS queue and process messages
@@ -47,6 +48,7 @@ def process_single_message(message: dict):
         transcode_file(db, file_id, s3_key, s3_client, raw_bucket, processed_bucket)
     except Exception as e:
         # If file_id was extracted, we can log failure against it
+        # Any failure from codec format, S3 download, ffmpeg transcoding, s3 upload
         if file_id:
             handle_processing_failure(db, file_id, e)
         else:
@@ -63,21 +65,18 @@ def get_video_codec(file_path: str) -> str: # returns `h264` or `hevc` (for h265
     try:
         print(f"Running ffprobe command: {' '.join(command)}")
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
-        codec = result.stdout.strip()
-        print("codec", codec)
-        return codec
+        codec_str = result.stdout.strip()
+        print("codec", codec_str)
+        return Codec(codec_str)
+    except ValueError:
+        raise RuntimeError(f"Unsupported codec detected: {codec_str}")
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"ffprobe get codec failed: {e.stderr}")
-
-def transcode_to_h265(input_path: str, output_path: str):
-    """Runs the ffmpeg transcoding command."""
-    print("running transcode_to_h265")
-    command = [
-        "ffmpeg", "-i", input_path, "-c:v", "libx265",
-        "-preset", "fast", "-crf", "28", "-vtag", "hvc1", "-c:a", "copy", output_path
-    ]
+    
+def ffmpeg_popen(command):
+    # prints out process output instead of subprocess.run which waits till it finishes
     try:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True, bufsize=1, universal_newlines=True)
         for line in process.stdout:
             print(f"[ffmpeg] {line.strip()}")
@@ -88,6 +87,23 @@ def transcode_to_h265(input_path: str, output_path: str):
             raise RuntimeError(f"FFmpeg transcode to h265 failed with exit code {process.returncode}")
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"FFmpeg process failed: {e.stderr}")
+
+def transcode_to_h264(input_path: str, output_path: str):
+    print(f"Transcoding from HEVC to H.264")
+    command = [
+        "ffmpeg", "-i", input_path, "-c:v", "libx264", # libx264 encoder
+        "-preset", "fast", "-crf", "23", "-c:a", "copy", output_path
+    ]
+    ffmpeg_popen(command)
+    
+def transcode_to_h265(input_path: str, output_path: str):
+    print(f"Transcoding from H.264 to HEVC")
+    command = [
+        "ffmpeg", "-i", input_path, "-c:v", "libx265", # libx265 encoder
+        "-preset", "fast", "-crf", "28", "-vtag", "hvc1", "-c:a", "copy", output_path
+    ]
+    ffmpeg_popen(command)
+    
 
 def transcode_file(db: Session, file_id: UUID, s3_key: str, s3_client, raw_bucket: str, processed_bucket: str):
     print(f"Processing file: {s3_key}")
@@ -112,14 +128,15 @@ def transcode_file(db: Session, file_id: UUID, s3_key: str, s3_client, raw_bucke
             raise RuntimeError(f"S3 Download Failed (Error: {error_code})") from e
         
         original_codec = get_video_codec(input_path)
-        if original_codec == "h264":
-            target_codec = "h265"
+
+        if original_codec == Codec.H264:
+            target_codec = Codec.HEVC
             transcode_to_h265(input_path, output_path)
-        elif original_codec == "hevc":
-            target_codec = "h264"
-            # transcode_to_h264() #GAB TODO
+        elif original_codec == Codec.HEVC:
+            target_codec = Codec.H264
+            transcode_to_h264(input_path, output_path)
         else:
-            raise RuntimeError(f"Not a valid file of codec type h264 or h265")
+            raise RuntimeError(f"Unsupported codec '{original_codec}' for transcoding.")
         
         try:
             print(f"Uploading transcoded file {output_path} to s3://{processed_bucket}/{s3_key}")

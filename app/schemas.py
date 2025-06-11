@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from uuid import UUID
-from .models import ProcessingStatus
+from .models import ProcessingStatus, Codec
+from typing import Optional
 
 class UploadResponse(BaseModel):
     file_id: UUID
@@ -15,6 +16,9 @@ class StatusResponse(BaseModel):
     file_name: str
     processing_status: ProcessingStatus
 
+    original_codec: Optional[Codec] = None
+    target_codec: Optional[Codec] = None
+    processing_time: Optional[float] = None
 
     class Config:
         orm_mode = True
