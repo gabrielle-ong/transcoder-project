@@ -9,6 +9,7 @@ from . import models, schemas, crud
 from uuid import uuid4, UUID
 import os
 from urllib.parse import urlparse
+from typing import Optional
 
 
 # Create DB tables on startup, checks that db container is ready (race condition bug)
@@ -29,33 +30,32 @@ def _get_file(db: Session, file_id: UUID) -> models.Files:
         raise HTTPException(status_code=404, detail=f"File with ID {file_id} not found.")
     return db_file
 
-# to stream S3 file
-def _stream_s3_file(s3_url: str, download_filename: str)-> StreamingResponse:
+# download from s3 presigned url
+def _get_presigned_s3_url(s3_url: str, download_filename: Optional[str]) -> StreamingResponse:
     s3_endpoint_url = os.getenv("S3_ENDPOINT_URL") or None
     s3_client = boto3.client("s3", endpoint_url=s3_endpoint_url)
 
+    s3_path = urlparse(s3_url, allow_fragments=False)
+    bucket_name = s3_path.netloc  # The bucket name
+    s3_key = s3_path.path.lstrip('/')
+
+    if not bucket_name or not s3_key:
+        raise ValueError("Invalid S3 URL provided.")
+    
+    params = {'Bucket': bucket_name, 'Key': s3_key}
+    if download_filename:
+        params['ResponseContentDisposition'] = f'attachment; filename="{download_filename}"'
+
     try:
-        s3_path = urlparse(s3_url, allow_fragments=False)
-        bucket_name = s3_path.netloc  # The bucket name is the "netloc" part
-        s3_key = s3_path.path.lstrip('/')  # The key is the path, minus the leading slash
-
-        if not bucket_name or not s3_key:
-            raise ValueError("Invalid S3 URL provided.")
-
-        s3_object = s3_client.get_object(Bucket=bucket_name, Key=s3_key)
-        
-        return StreamingResponse(
-            s3_object['Body'].iter_chunks(),
-            media_type='video/mp4',
-            headers={"Content-Disposition": f'attachment; filename="{download_filename}"'}
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params=params,
+            ExpiresIn=3600  # 1h
         )
-    except (ClientError, ValueError) as e:
-        error_detail = str(e)
-        if isinstance(e, ClientError) and e.response['Error']['Code'] == 'NoSuchKey':
-            raise HTTPException(status_code=404, detail=f"No such file in S3 processed bucket: {s3_key}")
-        
-        raise HTTPException(status_code=500, detail=f"Error streaming from S3: {error_detail}")
- 
+        return url
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=f"Could not generate presigned URL: {e}")
+
  #### end of helper functions #####   
 
 @app.post("/upload", response_model=schemas.UploadResponse)
@@ -90,12 +90,13 @@ def get_status(file_id: UUID, db: Session = Depends(get_db)):
     db_file = _get_file(db, file_id)
     return db_file
 
-@app.get("/upload/{file_id}/download/original")
+@app.get("/upload/{file_id}/download/original", response_model=schemas.DownloadURLResponse)
 def download_original_file(file_id: UUID, db: Session = Depends(get_db)):
     db_file = _get_file(db, file_id)
-    return _stream_s3_file(db_file.raw_file_url, db_file.file_name)
+    url = _get_presigned_s3_url(db_file.raw_file_url, db_file.file_name)
+    return {"download_url": url}
 
-@app.get("/upload/{file_id}/download/processed")
+@app.get("/upload/{file_id}/download/processed", response_model=schemas.DownloadURLResponse)
 def download_processed_file(file_id: UUID, db: Session = Depends(get_db)):
     db_file = _get_file(db, file_id)
     
@@ -104,6 +105,6 @@ def download_processed_file(file_id: UUID, db: Session = Depends(get_db)):
             status_code=404, 
             detail=f"Processed file not available. Current File status: {db_file.processing_status}"
         )
-
     download_filename = f"processed-{db_file.file_name}"
-    return _stream_s3_file(db_file.processed_file_url, download_filename)
+    url = _get_presigned_s3_url(db_file.processed_file_url, download_filename)
+    return {"download_url": url}

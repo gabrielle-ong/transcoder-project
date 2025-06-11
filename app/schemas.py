@@ -22,3 +22,6 @@ class StatusResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+class DownloadURLResponse(BaseModel):
+    download_url: str

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from . import crud, models
 from .models import Codec
-from .database import init_db, SessionLocal
+from .database import SessionLocal
 
 # Main loop to poll SQS queue and process messages
 def process_messages():
@@ -180,5 +180,4 @@ def handle_processing_failure(db: Session, file_id: UUID, error: Exception):
     crud.create_transaction(db, file_id, models.TransactionType.FAILURE, details=f"Upload failed: {str(error_details)}")
 
 if __name__ == "__main__":
-    init_db()
     process_messages()
