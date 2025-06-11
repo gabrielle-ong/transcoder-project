@@ -13,7 +13,8 @@ from .database import init_db, SessionLocal
 
 # Main loop to poll SQS queue and process messages
 def process_messages():
-    sqs_client = boto3.client("sqs", endpoint_url=os.getenv("SQS_ENDPOINT_URL"), region_name=os.getenv("REGION_NAME"))
+    sqs_endpoint_url = os.getenv("SQS_ENDPOINT_URL") or None
+    sqs_client = boto3.client("sqs", endpoint_url=sqs_endpoint_url, region_name=os.getenv("AWS_DEFAULT_REGION"))
     queue_url = os.getenv("SQS_QUEUE_URL")
 
     print("Worker started, polling for messages...")
@@ -33,7 +34,8 @@ def process_messages():
 
 def process_single_message(message: dict):
     db = SessionLocal()
-    s3_client = boto3.client("s3", endpoint_url=os.getenv("S3_ENDPOINT_URL"))
+    s3_endpoint_url = os.getenv("S3_ENDPOINT_URL") or None
+    s3_client = boto3.client("s3", endpoint_url=s3_endpoint_url)
     raw_bucket = os.getenv("S3_RAW_BUCKET")
     processed_bucket = os.getenv("S3_PROCESSED_BUCKET")
     file_id = None
