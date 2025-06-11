@@ -44,8 +44,18 @@ def process_single_message(message: dict):
         key_without_ext, _ = os.path.splitext(s3_key)
         uuid_str = key_without_ext[-36:]
         file_id = UUID(uuid_str) 
-        print("Transcoding file")
-        transcode_file(db, file_id, s3_key, s3_client, raw_bucket, processed_bucket)
+
+        ## Idempotency check - Get File Status, discard message if File status = PROCESSING
+        ## to avoid case where message queue triggers transcoding multiple times when file is already processing (but not yet completed)
+        db_file = crud.get_file(db, file_id)
+        if not db_file:
+            print(f"File ID {file_id} not found in database. Discarding message.")
+            return # Exit the function, the message will be deleted
+        current_status = db_file.processing_status
+        if current_status == models.ProcessingStatus.PENDING: # New transcoding job
+            transcode_file(db, file_id, s3_key, s3_client, raw_bucket, processed_bucket)
+        else: # is already being processed or complete, ignore
+            print(f"Skipping duplicate message for file_id: {file_id}. Current status: {current_status}")
     except Exception as e:
         # If file_id was extracted, we can log failure against it
         # Any failure from codec format, S3 download, ffmpeg transcoding, s3 upload
@@ -106,7 +116,7 @@ def transcode_to_h265(input_path: str, output_path: str):
     
 
 def transcode_file(db: Session, file_id: UUID, s3_key: str, s3_client, raw_bucket: str, processed_bucket: str):
-    print(f"Processing file: {s3_key}")
+    print(f"Transcoding file: {s3_key}")
     filename = os.path.basename(s3_key)
     input_path = f"/tmp/{filename}"
     output_path = f"/tmp/processed-{filename}"
