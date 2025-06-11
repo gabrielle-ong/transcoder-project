@@ -1,5 +1,7 @@
 import boto3
+from botocore.exceptions import ClientError
 from fastapi import FastAPI, Depends, File, UploadFile, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from .database import init_db, get_db
 # db_init race condition - need to import models so that init_db creates Files and Transactions models
@@ -26,7 +28,7 @@ def upload_file(db: Session = Depends(get_db), file: UploadFile = File(...)):
     raw_file_url = f"s3://{bucket_name}/{s3_key}"
 
     # 1. Create new File DB record; create new Transaction record type=Upload
-    db_file = crud.create_file_record(db, file_id, file.filename, raw_file_url)
+    db_file = crud.create_file_record(db, file_id, file.filename, raw_file_url) #File processing status = PENDING on creation
     crud.create_transaction(db, file_id, models.TransactionType.UPLOAD, details="Upload started by user")
 
     try:
@@ -38,7 +40,13 @@ def upload_file(db: Session = Depends(get_db), file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"S3 upload failed: {str(e)}")
 
     # 3. Handle File upload complete, pending in queue
-    crud.update_file_status(db, file_id, models.ProcessingStatus.PENDING)
     crud.create_transaction(db, file_id, models.TransactionType.PENDING, details="File upload complete, awaiting transcoding")
 
+    return db_file
+
+@app.get("/upload/{file_id}/status", response_model=schemas.StatusResponse)
+def get_status(file_id: UUID, db: Session = Depends(get_db)):
+    db_file = crud.get_file(db, file_id)
+    if db_file is None:
+        raise HTTPException(status_code=404, detail="File ID not found")
     return db_file

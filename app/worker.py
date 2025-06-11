@@ -24,10 +24,10 @@ def process_messages():
             print(body)
             # Ignore s3:TestEvent
             if body.get("Event") == "s3:TestEvent":
-                # sqs_client.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
+                sqs_client.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
                 continue
             process_single_message(message)
-            # sqs_client.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
+            sqs_client.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
 
 
 def process_single_message(message: dict):
@@ -150,6 +150,5 @@ def handle_processing_failure(db: Session, file_id: UUID, error: Exception):
     crud.create_transaction(db, file_id, models.TransactionType.FAILURE, details=f"Upload failed: {str(error_details)}")
 
 if __name__ == "__main__":
-    print("HELLO WORKER")
     init_db()
     process_messages()
