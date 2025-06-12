@@ -2,8 +2,8 @@
 #### PRE REQUISITES ####
 To run this end to end test locally, you need:
 1. Two test files provided (test_filess/bunny_264_2s.mp4, test_files/sintel_265_2s.mp)
-2. ffmpeg to verify the video codecs 
-3. `pip install -r requirements.txt`
+2. `pip install requests`
+3. ffmpeg to verify the video codecs 
 
 You can download ffmpeg via `brew install ffmpeg` (MacOS) or `sudo apt install ffmpeg` (Debian/Ubuntu)
 """
