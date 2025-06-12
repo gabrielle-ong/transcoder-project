@@ -9,7 +9,7 @@ class UploadResponse(BaseModel):
     processing_status: ProcessingStatus
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class StatusResponse(BaseModel):
     file_id: UUID
