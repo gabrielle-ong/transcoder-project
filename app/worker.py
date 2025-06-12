@@ -14,7 +14,7 @@ from .database import SessionLocal
 # Main loop to poll SQS queue and process messages
 def process_messages():
     sqs_endpoint_url = os.getenv("SQS_ENDPOINT_URL") or None
-    sqs_client = boto3.client("sqs", endpoint_url=sqs_endpoint_url, region_name=os.getenv("AWS_DEFAULT_REGION"))
+    sqs_client = boto3.client("sqs", endpoint_url=sqs_endpoint_url, region_name=os.getenv("AWS_REGION"))
     queue_url = os.getenv("SQS_QUEUE_URL")
 
     print("Worker started, polling for messages...")

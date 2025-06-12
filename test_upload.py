@@ -33,7 +33,7 @@ def test_upload_file(filepath: str) -> str:
     response.raise_for_status()
     file_id = response.json()['file_id']
     if file_id:
-            print(f"Success: Upload successful for {os.path.basename(file_path)}, File ID: {file_id}")
+            print(f"✅ Upload successful for {os.path.basename(file_path)}, File ID: {file_id}")
     return file_id
 
 def test_unhappy_path_download(file_id: str):
@@ -44,11 +44,11 @@ def test_unhappy_path_download(file_id: str):
     response = requests.get(download_processed_endpoint)
     print(f"response: {response}")
     assert response.status_code == 404
-    print(f"Success: Received expected 404 Not Found.")
+    print(f"✅ Received expected 404 Not Found.")
     
     response_json = response.json()
     assert "not available" in response_json.get("detail", "")
-    print(f"Success: Response contains correct error message: '{response_json.get('detail')}'")
+    print(f"✅ Response contains correct error message: '{response_json.get('detail')}'")
 
 
 def test_poll_for_completion(file_id: str) -> dict:
@@ -76,7 +76,7 @@ def test_poll_for_completion(file_id: str) -> dict:
     if status != "completed":
         raise RuntimeError(f"Transcoding failed with final status: '{status}'")
 
-    print(f"Success: Transcoding completed for {os.path.basename(file_path)}! Final Status: {status}")
+    print(f"✅ Transcoding completed for {os.path.basename(file_path)}! Final Status: {status}")
 
 def download_to_local(download_endpoint: str, file_path: str, local_path: str):
     # get s3 Presigned URLS
@@ -85,7 +85,7 @@ def download_to_local(download_endpoint: str, file_path: str, local_path: str):
     file_req.raise_for_status()
     with open(local_path, 'wb') as f:
         f.write(file_req.content)
-    print(f"Success: File of size {len(file_req.content)} bytes downloaded successfully from S3 to {local_path}")
+    print(f"✅ File of size {len(file_req.content)} bytes downloaded successfully from S3 to {local_path}")
 
 def get_local_file_codec(file_path: str) -> str:
     """ Detects codec of a local file_path, returns either h264 or hevc"""
