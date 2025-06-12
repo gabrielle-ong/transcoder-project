@@ -9,6 +9,7 @@ services:
     env_file:
       - .env.aws
   db-init:
+    image: gabrielleong/transcoder-api:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -19,6 +20,7 @@ services:
       - .env.aws
     command: [ "python", "-u", "-m", "app.db_init" ]
   api:
+    image: gabrielleong/transcoder-api:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -33,6 +35,7 @@ services:
     volumes:
       - ./:/code # for local dev: binded mount to reload changes to docker: host currentdir to docker /app dir
   worker:
+    image: gabrielleong/transcoder-worker:latest
     build:
       context: .
       dockerfile: Dockerfile.worker
