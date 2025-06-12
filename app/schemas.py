@@ -21,7 +21,7 @@ class StatusResponse(BaseModel):
     processing_time: Optional[float] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class DownloadURLResponse(BaseModel):
     download_url: str

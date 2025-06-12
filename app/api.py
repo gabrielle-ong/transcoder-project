@@ -1,16 +1,24 @@
+import os
 import boto3
+import logging
 from botocore.exceptions import ClientError
+from boto3.s3.transfer import TransferConfig
 from fastapi import FastAPI, Depends, File, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from .database import init_db, get_db
-# db_init race condition - need to import models so that init_db creates Files and Transactions models
-from . import models, schemas, crud
 from uuid import uuid4, UUID
-import os
 from urllib.parse import urlparse
 from typing import Optional
+# db_init race condition - need to import models so that init_db creates Files and Transactions models
+from . import models, schemas, crud
+from .database import init_db, get_db
 
+
+### To view s3 Multipart upload
+# eg DEBUG:botocore.endpoint:Making request for OperationModel(name=CompleteMultipartUpload) with params: {'url_path': '...'
+# logging.basicConfig(level=logging.INFO)
+# logging.getLogger('boto3').setLevel(logging.DEBUG)
+# logging.getLogger('botocore').setLevel(logging.DEBUG)
 
 # Create DB tables on startup, checks that db container is ready (race condition bug)
 init_db()
@@ -72,9 +80,18 @@ def upload_file(db: Session = Depends(get_db), file: UploadFile = File(...)):
     db_file = crud.create_file_record(db, file_id, file.filename, raw_file_url) #File processing status = PENDING on creation
     crud.create_transaction(db, file_id, models.TransactionType.UPLOAD, details="Upload started by user")
 
+    # Multipart Upload configs
+    MB = 1024 * 1024
+    config = TransferConfig(
+        multipart_threshold = 4 * MB,  # 4MB; Production numbers: 20MB
+        max_concurrency = 5,
+        multipart_chunksize = 2 * MB, # 2MB; Production numbers: 10MB
+        use_threads=True
+    )
     #2. Upload to S3
     try:
-        s3_client.upload_fileobj(file.file, bucket_name, s3_key)
+        print(f"Uploading {s3_key} file to S3 {raw_file_url}...")
+        s3_client.upload_fileobj(file.file, bucket_name, s3_key, Config=config)
     except Exception as e:
         crud.update_file_status(db, file_id, models.ProcessingStatus.FAILED)
         crud.create_transaction(db, file_id, models.TransactionType.FAILURE, details=f"Upload failed: {str(e)}")
