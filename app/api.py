@@ -9,9 +9,8 @@ from sqlalchemy.orm import Session
 from uuid import uuid4, UUID
 from urllib.parse import urlparse
 from typing import Optional
-# db_init race condition - need to import models so that init_db creates Files and Transactions models
 from . import models, schemas, crud
-from .database import init_db, get_db
+from .database import get_db
 
 
 ### To view s3 Multipart upload
@@ -19,9 +18,6 @@ from .database import init_db, get_db
 # logging.basicConfig(level=logging.INFO)
 # logging.getLogger('boto3').setLevel(logging.DEBUG)
 # logging.getLogger('botocore').setLevel(logging.DEBUG)
-
-# Create DB tables on startup, checks that db container is ready (race condition bug)
-init_db()
 
 app = FastAPI()
 
